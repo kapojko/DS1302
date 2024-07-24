@@ -43,8 +43,8 @@ bool DS1302_SetWriteProtect(bool writeProtect); // power-on state is not defined
 bool DS1302_SetClockHalt(bool clockHalt); // power-on state is not defined, must be explicitly set
 bool DS1302_GetClockHalt(bool *clockHalt);
 
-bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *year, int *wday);
-bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, int wday);
+bool DS1302_GetClock(int *sec, int *mins, int *hour, int *date, int *month, int *year, int *wday);
+bool DS1302_SetClock(int sec, int mins, int hour, int date, int month, int year, int wday);
 
 bool DS1302_ReadRamReg(int reg, uint8_t *data);
 bool DS1302_WriteRamReg(int reg, uint8_t data);

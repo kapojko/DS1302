@@ -128,7 +128,7 @@ bool DS1302_GetClockHalt(bool *clockHalt) {
     return true;
 }
 
-bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *year, int *wday) {
+bool DS1302_GetClock(int *sec, int *mins, int *hour, int *date, int *month, int *year, int *wday) {
     // Perform burst read of 8 clock registers
     uint8_t data[8];
     if (!DS1302_ReadReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
@@ -147,7 +147,7 @@ bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *
 
     // Parse min
     int minBcd = data[1] & 0x7F;
-    *min = (minBcd >> 4) * 10 + (minBcd & 0x0F);
+    *mins = (minBcd >> 4) * 10 + (minBcd & 0x0F);
 
     // Parse hour
     int hr12_24 = (data[2] >> 7) & 0x01;
@@ -183,7 +183,7 @@ bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *
     return true;
 }
 
-bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, int wday) {
+bool DS1302_SetClock(int sec, int mins, int hour, int date, int month, int year, int wday) {
     // Reset write protect
     if (!DS1302_SetWriteProtect(false)) {
         return false;
@@ -192,7 +192,7 @@ bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, 
     // Prepare buffer for burst of 8 clock registers
     uint8_t data[8];
     data[0] = (sec / 10) << 4 | (sec % 10); // CH bit = 0, clock is on
-    data[1] = (min / 10) << 4 | (min % 10);
+    data[1] = (mins / 10) << 4 | (mins % 10);
     data[2] = (hour / 10) << 7 | (hour % 10) | ((int)DS1302_24 << 7); // 24h mode
     data[3] = (date / 10) << 4 | (date % 10);
     data[4] = (month / 10) << 4 | (month % 10);
