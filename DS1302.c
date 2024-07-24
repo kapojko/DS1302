@@ -1,25 +1,27 @@
 #include <string.h>
 #include "DS1302.h"
 
-#define REG_SEC_ADDR 0x40
-#define REF_MIN_ADDR 0x41
-#define REG_HR_ADDR 0x42
-#define REG_DATE_ADDR 0x43
-#define REG_MONTH_ADDR 0x44
-#define REG_DAY_ADDR 0x45
-#define REG_YEAR_ADDR 0x46
-#define REG_CONTROL_ADDR 0x47
-#define REG_TRICKLE_CHARGER_ADDR 0x48
-#define REG_CLOCK_BURST_ADDR 0x5F
+#define REG_SEC_ADDR 0x0
+#define REF_MIN_ADDR 0x1
+#define REG_HR_ADDR 0x2
+#define REG_DATE_ADDR 0x3
+#define REG_MONTH_ADDR 0x4
+#define REG_DAY_ADDR 0x5
+#define REG_YEAR_ADDR 0x6
+#define REG_CONTROL_ADDR 0x7
+#define REG_TRICKLE_CHARGER_ADDR 0x8
 
-#define REG_RAM_0_ADDR 0x60 // RAM 0-30 (0x60-0x7E)
-#define REG_RAM_BURST_ADDR 0x7F
+#define REG_RAM_0_ADDR 0x0 // RAM 0-30
+
+#define REG_BURST 0x1F
 
 #define AC_READ 1 // Bit 0
 #define AC_WRITE 0 // Bit 0
 
 #define RC_RAM 1 // Bit 6
 #define RC_CLOCK 0 // Bit 6
+
+// #define DEBUG_PRINT_READ_WRITE
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -39,18 +41,34 @@ bool DS1302_ReadReg(int addr, int rc, uint8_t *data, int len) {
     // Set nRST to start transfer
     platform.gpioSet(platform.pinNrst, 1);
 
+    // Delay not less than 1-4 us (tCC)
+    platform.delayUs(4);
+
     // Perform send/receive
     int ret = platform.spiSendRecv(&ac, 1, data, len);
     if (ret < 0) {
         platform.debugPrint("spiSendRecv for reg %x len %d failed: %d\r\n", addr, len, -ret);
-        platform.gpioSet(platform.pinNrst, 0);
-        return false;
     }
 
     // Reset nRST to stop transfer
     platform.gpioSet(platform.pinNrst, 0);
 
-    return true;
+    // Delay not less than 1-4 us (tCWH)
+    platform.delayUs(4);
+
+#ifdef DEBUG_PRINT_READ_WRITE
+    if (len == 1) {
+        platform.debugPrint("Read REG %x (rc=%d): %02x\r\n", addr, rc, data[0]);
+    } else {
+        platform.debugPrint("Read REG %x (rc=%d): ", addr, rc);
+        for (int i = 0; i < len; i++) {
+            platform.debugPrint("%02x ", data[i]);
+        }
+        platform.debugPrint("\r\n");
+    }
+#endif
+
+    return (ret >= 0);
 }
 
 bool DS1302_WriteReg(int addr, int rc, const uint8_t *data, int len) {
@@ -65,18 +83,34 @@ bool DS1302_WriteReg(int addr, int rc, const uint8_t *data, int len) {
     // Set nRST to start transfer
     platform.gpioSet(platform.pinNrst, 1);
 
+    // Delay not less than 1-4 us (tCC)
+    platform.delayUs(4);
+
     // Perform send
     int ret = platform.spiSend(spiBuf, len + 1);
     if (ret < 0) {
         platform.debugPrint("spiSend for reg %x len %d failed: %d\r\n", addr, len, -ret);
-        platform.gpioSet(platform.pinNrst, 0);
-        return false;
     }
 
     // Reset nRST to stop transfer
     platform.gpioSet(platform.pinNrst, 0);
 
-    return true;
+    // Delay not less than 1-4 us (tCWH)
+    platform.delayUs(4);
+
+#ifdef DEBUG_PRINT_READ_WRITE
+    if (len == 1) {
+        platform.debugPrint("Write REG %x (rc=%d): %02x\r\n", addr, rc, data[0]);
+    } else {
+        platform.debugPrint("Write REG %x (rc=%d): ", addr, rc);
+        for (int i = 0; i < len; i++) {
+            platform.debugPrint("%02x ", data[i]);
+        }
+        platform.debugPrint("\r\n");
+    }
+#endif
+
+    return (ret >= 0);
 }
 
 bool DS1302_SetWriteProtect(bool writeProtect) {
@@ -131,7 +165,7 @@ bool DS1302_GetClockHalt(bool *clockHalt) {
 bool DS1302_GetClock(int *sec, int *mins, int *hour, int *date, int *month, int *year, int *wday) {
     // Perform burst read of 8 clock registers
     uint8_t data[8];
-    if (!DS1302_ReadReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
+    if (!DS1302_ReadReg(REG_BURST, RC_CLOCK, data, 8)) {
         return false;
     }
 
@@ -193,7 +227,7 @@ bool DS1302_SetClock(int sec, int mins, int hour, int date, int month, int year,
     uint8_t data[8];
     data[0] = (sec / 10) << 4 | (sec % 10); // CH bit = 0, clock is on
     data[1] = (mins / 10) << 4 | (mins % 10);
-    data[2] = (hour / 10) << 7 | (hour % 10) | ((int)DS1302_24 << 7); // 24h mode
+    data[2] = (hour / 10) << 4 | (hour % 10) | ((int)DS1302_24 << 7); // 24h mode
     data[3] = (date / 10) << 4 | (date % 10);
     data[4] = (month / 10) << 4 | (month % 10);
     data[5] = (wday / 10) << 4 | (wday % 10);
@@ -201,7 +235,7 @@ bool DS1302_SetClock(int sec, int mins, int hour, int date, int month, int year,
     data[7] = 0; // WP bit = 0, no write protect
 
     // Write clock registers (burst)
-    if (!DS1302_WriteReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
+    if (!DS1302_WriteReg(REG_BURST, RC_CLOCK, data, 8)) {
         return false;
     }
 

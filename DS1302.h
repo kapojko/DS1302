@@ -29,6 +29,7 @@ struct DS1302_Platform {
     int (*spiSendRecv)(uint8_t *tdata, int tlen, uint8_t *rdata, int rlen);
 
     void (*delayMs)(int ms);
+    void (*delayUs)(int us);
     void (*debugPrint)(const char *fmt, ...);
 
     int pinNrst;
