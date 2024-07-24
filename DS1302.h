@@ -35,7 +35,13 @@ struct DS1302_Platform {
 };
 
 void DS1302_Init(struct DS1302_Platform *platform);
+
+bool DS1302_ReadReg(int addr, int rc, uint8_t *data, int len);
+bool DS1302_WriteReg(int addr, int rc, const uint8_t *data, int len);
+
+bool DS1302_SetWriteProtect(bool writeProtect); // power-on state is not defined, must be explicitly set
 bool DS1302_SetClockHalt(bool clockHalt); // power-on state is not defined, must be explicitly set
+bool DS1302_GetClockHalt(bool *clockHalt);
 
 bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *year, int *wday);
 bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, int wday);

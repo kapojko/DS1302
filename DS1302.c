@@ -27,7 +27,11 @@ static struct DS1302_Platform platform;
 
 static uint8_t spiBuf[DS1302_SPI_LENGTH_MAX];
 
-static bool readReg(int addr, int rc, uint8_t *data, int len) {
+void DS1302_Init(struct DS1302_Platform *platformPtr) {
+    platform = *platformPtr;
+}
+
+bool DS1302_ReadReg(int addr, int rc, uint8_t *data, int len) {
     // Prepare address/control byte
     // NOTE: The MSB (Bit 7) must be a logic 1
     uint8_t ac = (1 << 7) | (rc << 6) | (addr << 1) | AC_READ;
@@ -49,7 +53,7 @@ static bool readReg(int addr, int rc, uint8_t *data, int len) {
     return true;
 }
 
-static bool writeReg(int addr, int rc, const uint8_t *data, int len) {
+bool DS1302_WriteReg(int addr, int rc, const uint8_t *data, int len) {
     // Prepare address/control byte
     // NOTE: The MSB (Bit 7) must be a logic 0
     uint8_t ac = (1 << 7) | (rc << 6) | (addr << 1) | AC_WRITE;
@@ -75,7 +79,7 @@ static bool writeReg(int addr, int rc, const uint8_t *data, int len) {
     return true;
 }
 
-static bool setWriteProtect(bool writeProtect) {
+bool DS1302_SetWriteProtect(bool writeProtect) {
     // Prepare control register
     uint8_t control = 0;
     if (writeProtect) {
@@ -83,11 +87,7 @@ static bool setWriteProtect(bool writeProtect) {
     }
 
     // Write control register
-    return writeReg(REG_CONTROL_ADDR, RC_CLOCK, &control, 1);
-}
-
-void DS1302_Init(struct DS1302_Platform *platformPtr) {
-    platform = *platformPtr;
+    return DS1302_WriteReg(REG_CONTROL_ADDR, RC_CLOCK, &control, 1);
 }
 
 bool DS1302_SetClockHalt(bool clockHalt) {
@@ -95,10 +95,10 @@ bool DS1302_SetClockHalt(bool clockHalt) {
 
     // Bit 7 of the seconds register is defined as the clock halt flag
     uint8_t sec = 0;
-    ok &= readReg(REG_SEC_ADDR, RC_CLOCK, &sec, 1);
+    ok &= DS1302_ReadReg(REG_SEC_ADDR, RC_CLOCK, &sec, 1);
 
     // Reset write protect
-    ok &= setWriteProtect(false);
+    ok &= DS1302_SetWriteProtect(false);
 
     // Update clock halt flag
     sec &= 0x7F;
@@ -107,18 +107,31 @@ bool DS1302_SetClockHalt(bool clockHalt) {
     }
 
     // Write seconds register
-    ok &= writeReg(REG_SEC_ADDR, RC_CLOCK, &sec, 1);
+    ok &= DS1302_WriteReg(REG_SEC_ADDR, RC_CLOCK, &sec, 1);
 
     // Set write protect
-    ok &= setWriteProtect(true);
+    ok &= DS1302_SetWriteProtect(true);
 
     return ok;
+}
+
+bool DS1302_GetClockHalt(bool *clockHalt) {
+    // Read seconds register
+    uint8_t sec = 0;
+    if (!DS1302_ReadReg(REG_SEC_ADDR, RC_CLOCK, &sec, 1)) {
+        return false;
+    }
+
+    // Parse clock halt flag
+    *clockHalt = sec & 0x80;
+    
+    return true;
 }
 
 bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *year, int *wday) {
     // Perform burst read of 8 clock registers
     uint8_t data[8];
-    if (!readReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
+    if (!DS1302_ReadReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
         return false;
     }
 
@@ -172,7 +185,7 @@ bool DS1302_GetClock(int *sec, int *min, int *hour, int *date, int *month, int *
 
 bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, int wday) {
     // Reset write protect
-    if (!setWriteProtect(false)) {
+    if (!DS1302_SetWriteProtect(false)) {
         return false;
     }
 
@@ -188,12 +201,12 @@ bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, 
     data[7] = 0; // WP bit = 0, no write protect
 
     // Write clock registers (burst)
-    if (!writeReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
+    if (!DS1302_WriteReg(REG_CLOCK_BURST_ADDR, RC_CLOCK, data, 8)) {
         return false;
     }
 
     // Set write protect
-    if (!setWriteProtect(true)) {
+    if (!DS1302_SetWriteProtect(true)) {
         return false;
     }
 
@@ -202,22 +215,22 @@ bool DS1302_SetClock(int sec, int min, int hour, int date, int month, int year, 
 
 bool DS1302_ReadRamReg(int reg, uint8_t *data) {
     // Read RAM register
-    return readReg(REG_RAM_0_ADDR + reg, RC_RAM, data, 1);
+    return DS1302_ReadReg(REG_RAM_0_ADDR + reg, RC_RAM, data, 1);
 }
 
 bool DS1302_WriteRamReg(int reg, uint8_t data) {
     // Reset write protect
-    if (!setWriteProtect(false)) {
+    if (!DS1302_SetWriteProtect(false)) {
         return false;
     }
 
     // Write RAM register
-    if (!writeReg(REG_RAM_0_ADDR + reg, RC_RAM, &data, 1)) {
+    if (!DS1302_WriteReg(REG_RAM_0_ADDR + reg, RC_RAM, &data, 1)) {
         return false;
     }
 
     // Set write protect
-    if (!setWriteProtect(true)) {
+    if (!DS1302_SetWriteProtect(true)) {
         return false;
     }
 
