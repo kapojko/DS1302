@@ -25,13 +25,13 @@ struct DS1302_Platform {
     int (*gpioGet)(int pin);
     void (*gpioSet)(int pin, int state);
 
-    int (*spiSend)(const uint8_t *data, int len);
-    int (*spiSendRecv)(const uint8_t *tdata, int tlen, uint8_t *rdata, int rlen);
+    int (*spiSend)(uint8_t *data, int len);
+    int (*spiSendRecv)(uint8_t *tdata, int tlen, uint8_t *rdata, int rlen);
 
     void (*delayMs)(int ms);
     void (*debugPrint)(const char *fmt, ...);
 
-    uint8_t pinNrst;
+    int pinNrst;
 };
 
 void DS1302_Init(struct DS1302_Platform *platform);
